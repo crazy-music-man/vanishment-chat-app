@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Van!shment chat</title>
+<style>
+  :root {
+    --bg: linear-gradient(135deg, #c8eef6 0%, #e4f4ee 40%, #f0eeda 100%);
+    --bg-flat: #e4f2ee;
+    --ink: #1e3340;
+    --muted: #5e8890;
+    --mine: #4aabb8;
+    --mine-text: #ffffff;
+    --ghost-line: #92c4bc;
+    --bar: rgba(255,255,255,.92);
+    --accent: #3a9fad;
+    --shadow: rgba(100,180,190,.1);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+
+  /* ---- lobby ---- */
+  #lobby {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    align-items: center; gap: 18px; padding: 28px; text-align: center;
+  }
+  #lobby p { color: var(--muted); font-size: 13.5px; line-height: 1.8; margin: 0; max-width: 320px; }
+  .room { display: flex; gap: 8px; align-items: center; }
+  .room input {
+    border: 1px solid #c2ddd6; border-radius: 12px; padding: 10px 14px;
+    font-size: 16px; background: rgba(255,255,255,.6); width: 200px; text-align: center;
+  }
+  .room input:focus { outline: none; border-color: var(--accent); }
+  .lobby-section { width: 100%; max-width: 300px; }
+  .lobby-section button {
+    width: 100%; border: 1px solid #c2ddd6; background: rgba(255,255,255,.65); border-radius: 14px;
+    padding: 14px; font-size: 15px; font-weight: 600; color: var(--ink); cursor: pointer;
+  }
+  .lobby-section button:active { background: rgba(255,255,255,.85); border-color: var(--accent); }
+  #lobbyStatus { font-size: 13px; color: var(--accent); min-height: 20px; }
+
+  /* ---- header ---- */
+  header {
+    flex: 0 0 auto; background: rgba(255,255,255,.88); border-bottom: 1px solid #c2ddd6;
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+    display: flex; align-items: center; gap: 10px;
+    position: relative;
+  }
+  .header-spacer { flex: 1; }
+  .menu-btn {
+    border: 0; background: transparent; color: var(--ink); font-size: 22px;
+    padding: 4px; cursor: pointer; line-height: 1;
+  }
+  .shutter-btn {
+    border: 2px solid var(--muted); background: transparent;
+    width: 28px; height: 28px; border-radius: 50%;
+    padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .shutter-btn::after {
+    content: ""; display: block;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--muted);
+  }
+  .shutter-btn:active { opacity: .5; }
+
+  /* ---- menu panel ---- */
+  .menu-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 90;
+  }
+  .menu-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 260px;
+    background: var(--bar); z-index: 100;
+    box-shadow: -4px 0 16px var(--shadow);
+    padding: calc(20px + env(safe-area-inset-top)) 20px 20px;
+    display: flex; flex-direction: column; gap: 20px;
+    animation: slideIn .2s ease;
+  }
+  @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  .menu-panel h3 { margin: 0; font-size: 14px; font-weight: 600; }
+  .menu-item { font-size: 13px; color: var(--muted); line-height: 1.8; }
+  .menu-item b { color: var(--ink); font-weight: 600; }
+  .menu-action {
+    border: 1px solid #c2ddd6; background: rgba(255,255,255,.6); border-radius: 10px;
+    padding: 10px; font-size: 14px; color: var(--ink); cursor: pointer; text-align: left;
+  }
+  .menu-action:active { background: rgba(255,255,255,.85); }
+
+  /* ---- thread ---- */
+  .thread {
+    flex: 1 1 auto; overflow-y: auto; padding: 16px 14px 8px;
+    display: flex; flex-direction: column; gap: 10px; -webkit-overflow-scrolling: touch;
+  }
+  .row { display: flex; }
+  .row.right { justify-content: flex-end; }
+  .row.left  { justify-content: flex-start; align-items: flex-start; }
+  .bubble-row-wrap { max-width: 70%; width: fit-content; position: relative; }
+  .bubble {
+    padding: 10px 13px; border-radius: 18px;
+    font-size: 15.5px; line-height: 1.45; word-break: break-word;
+    position: relative; animation: pop .18s ease;
+  }
+  @keyframes pop { from { transform: scale(.96); opacity:.4 } to { transform: scale(1); opacity:1 } }
+  .bubble a { color: var(--accent); word-break: break-all; }
+  .bubble.mine a { color: #eafcff; }
+  .bubble.mine  { background: var(--mine); color: var(--mine-text); border-bottom-right-radius: 5px; }
+  .bubble.them  { background: rgba(255,255,255,.85); color: var(--ink); border:1px solid #a3cfc6; border-bottom-left-radius: 5px; }
+  .reaction {
+    font-size: 20px; display: inline-block;
+    background: rgba(255,255,255,.8); border: 1px solid #c2ddd6; border-radius: 999px;
+    padding: 1px 6px; margin-top: -6px; position: relative; z-index: 1;
+    animation: pop .18s ease;
+  }
+  .row.left .reaction { margin-left: 8px; }
+  .row.right .reaction { margin-right: 8px; align-self: flex-end; }
+  .bubble.ghost {
+    background: rgba(255,255,255,.4); border: 1px dashed var(--ghost-line); color: transparent;
+    min-width: 54px; min-height: 38px; border-radius: 18px; border-bottom-left-radius: 5px;
+    user-select: none; -webkit-user-select: none;
+  }
+  .ghost-fade { animation: fade .9s ease forwards; }
+  @keyframes fade {
+    0%   { color: var(--ink); border-color: transparent; background: rgba(255,255,255,.7); }
+    100% { color: transparent; border-color: var(--ghost-line); background: rgba(255,255,255,.4); }
+  }
+  .empty { margin: auto; color: var(--muted); font-size: 13px; text-align:center; line-height:1.9; padding: 0 30px; }
+
+  /* ---- reaction trigger & picker ---- */
+  .react-trigger {
+    border: 0; background: rgba(93,184,196,.15); border-radius: 50%; width: 24px; height: 24px;
+    font-size: 12px; line-height: 1; color: var(--muted); flex: 0 0 auto;
+    margin-top: 4px; cursor: pointer;
+  }
+  .react-trigger:active { transform: scale(.9); }
+  .react-picker {
+    display: flex; gap: 4px; background: rgba(255,255,255,.85); border: 1px solid #c2ddd6;
+    border-radius: 999px; padding: 4px 8px; box-shadow: 0 4px 12px var(--shadow);
+    position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 10;
+    animation: pop .15s ease;
+  }
+  .react-picker button {
+    border: 0; background: transparent; font-size: 22px; padding: 4px;
+    border-radius: 50%; width: 36px; height: 36px; line-height: 1; cursor: pointer;
+  }
+  .react-picker button:hover { background: rgba(93,184,196,.1); }
+  .react-picker button:active { transform: scale(.85); }
+
+  /* ---- composer ---- */
+  .composer {
+    flex: 0 0 auto; background: rgba(255,255,255,.88); border-top: 1px solid #c2ddd6;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  }
+  .inputrow { display:flex; gap:8px; align-items:flex-end; }
+  textarea {
+    flex:1; resize:none; border:1px solid #c2ddd6; border-radius:20px;
+    padding:10px 14px; font-size:16px; font-family:inherit; max-height:120px; line-height:1.4; background:rgba(255,255,255,.5);
+  }
+  textarea:focus { outline:none; border-color: var(--accent); }
+  .send { flex:0 0 auto; border:0; background: var(--mine); color:#fff; border-radius:50%; width:44px; height:44px; font-size:18px; }
+  .send:disabled { opacity:.35; }
+
+  .hidden { display: none !important; }
+
+  /* ---- capture overlay ---- */
+  .capture-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,.85);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 20px; gap: 16px;
+  }
+  .capture-overlay img {
+    max-width: 100%; max-height: 70vh;
+    border-radius: 8px; object-fit: contain;
+    -webkit-touch-callout: default;
+  }
+  .capture-hint {
+    color: rgba(255,255,255,.7); font-size: 13px; text-align: center;
+  }
+  .capture-close {
+    border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff;
+    border-radius: 10px; padding: 10px 28px; font-size: 14px; cursor: pointer;
+  }
+  .capture-close:active { background: rgba(255,255,255,.15); }
+</style>
+</head>
+<body>
+  <!-- ロビー -->
+  <div id="lobby">
+    <p>同じ「あいことば」を入れた二人がつながります。<br>同じWiFi内の端末でこのページを開いてください。</p>
+    <div id="lobbyStatus"></div>
+    <div class="room">
+      <label for="roomInput" style="font-size:13px;color:var(--muted)">あいことば</label>
+      <input id="roomInput" placeholder="" autocomplete="off" />
+    </div>
+    <div class="lobby-section">
+      <button id="startBtn">会話をはじめる</button>
+    </div>
+  </div>
+
+  <!-- チャット -->
+  <header class="hidden" id="chatHeader">
+    <button class="shutter-btn" id="captureBtn" title="キャプチャ"></button>
+    <div class="header-spacer"></div>
+    <button class="menu-btn" id="menuBtn" title="メニュー">☰</button>
+  </header>
+
+  <div class="thread hidden" id="thread"></div>
+
+  <div class="composer hidden" id="composer">
+    <div class="inputrow">
+      <textarea id="input" rows="1" placeholder="メッセージを入力…"></textarea>
+      <button class="send" id="sendBtn" disabled>↑</button>
+    </div>
+  </div>
+
+<script>
+/* =========================================================
+   WebSocket Transport
+   サーバー(server.py)に接続し、あいことばでルームに参加。
+   同じルームの相手とメッセージを中継する。
+   ========================================================= */
+class WSTransport {
+  constructor(onMessage) {
+    this.ws = null;
+    this.onMessage = onMessage;
+    this.queue = [];
+    this.intentionalClose = false;
+  }
+
+  connect(room, onJoined) {
+    const host = location.hostname;
+    const wsPort = 8001;
+    this.ws = new WebSocket(`ws://${host}:${wsPort}`);
+
+    this.ws.addEventListener("open", () => {
+      this.ws.send(JSON.stringify({ type: "join", room }));
+    });
+
+    this.ws.addEventListener("message", (e) => {
+      let data;
+      try { data = JSON.parse(e.data); } catch { return; }
+
+      if (data.type === "joined") {
+        for (const obj of this.queue) this.ws.send(JSON.stringify(obj));
+        this.queue = [];
+        if (onJoined) onJoined();
+        return;
+      }
+      if (data.type === "full") {
+        if (this.onFull) this.onFull();
+        return;
+      }
+      this.onMessage(data);
+    });
+
+    this.ws.addEventListener("close", () => {
+      if (!this.intentionalClose) setStatus("サーバーとの接続が切れました");
+    });
+
+    this.ws.addEventListener("error", () => {
+      if (!this.intentionalClose) setStatus("サーバーに接続できません。server.py が起動しているか確認してください。");
+    });
+  }
+
+  send(obj) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(obj));
+    } else {
+      this.queue.push(obj);
+    }
+  }
+
+  close() {
+    this.intentionalClose = true;
+    if (this.ws) this.ws.close();
+  }
+}
+
+/* =========================================================
+   状態
+   ========================================================= */
+const STAMPS = ["👍","❤️","😂","🙏","😮","😢","✨","👀"];
+let myId = null;
+let room = "";
+let transport = null;
+
+let history = [];
+let pendingMessages = [];
+let fadeIds = new Set();
+let startedAt = null;
+let updatedAt = null;
+
+const storeKey = () => `kieru_remote_v2::${room}::${myId}`;
+
+function save() {
+  localStorage.setItem(storeKey(), JSON.stringify({ history, startedAt, updatedAt }));
+}
+function loadLocal() {
+  try {
+    const s = JSON.parse(localStorage.getItem(storeKey()));
+    if (s && Array.isArray(s.history)) {
+      history = s.history;
+      startedAt = s.startedAt || null;
+      updatedAt = s.updatedAt || null;
+    }
+  } catch (e) {}
+}
+function now() {
+  const d = new Date();
+  return ("0"+d.getHours()).slice(-2) + ":" + ("0"+d.getMinutes()).slice(-2);
+}
+
+/* =========================================================
+   ロビー
+   ========================================================= */
+const $ = (id) => document.getElementById(id);
+
+function setStatus(msg) {
+  $("lobbyStatus").textContent = msg;
+}
+
+$("startBtn").addEventListener("click", () => {
+  room = ($("roomInput").value || "").trim();
+  if (!room) { setStatus("あいことばを入力してください"); return; }
+
+  $("startBtn").disabled = true;
+  setStatus("接続しています…");
+
+  myId = sessionStorage.getItem("kieru_wid");
+  if (!myId) {
+    myId = "w-" + Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem("kieru_wid", myId);
+  }
+  loadLocal();
+
+  transport = new WSTransport(onMessage);
+  transport.onFull = () => {
+    setStatus("ごめんなさい。このルームにはすでに二人います。");
+    $("startBtn").disabled = false;
+    transport.close();
+  };
+  transport.connect(room, () => {
+    setStatus("");
+    $("lobby").classList.add("hidden");
+    $("chatHeader").classList.remove("hidden");
+    $("thread").classList.remove("hidden");
+    $("composer").classList.remove("hidden");
+
+    transport.send({ type: "hello", from: myId });
+    render();
+  });
+});
+
+/* =========================================================
+   受信
+   ========================================================= */
+function onMessage(obj) {
+  if (!obj || obj.from === myId) return;
+
+  if (obj.type === "hello") {
+    const lastMine = [...history].reverse().find(e => e.side === "me");
+    if (lastMine) {
+      transport.send({ type:"msg", from: myId, kind: lastMine.kind,
+                       content: lastMine.content, time: lastMine.time, id: lastMine.id });
+    }
+    return;
+  }
+
+  if (obj.type === "msg") {
+    if (pendingMessages.some(p => p.id === obj.id)) return;
+    if (history.some(e => e.id === obj.id)) return;
+
+    if (!startedAt) startedAt = new Date().toISOString();
+    updatedAt = new Date().toISOString();
+    pendingMessages.push({ kind: obj.kind, content: obj.content, time: obj.time, id: obj.id });
+    save();
+    render();
+  }
+
+  if (obj.type === "end") {
+    endedByPeer();
+    return;
+  }
+
+  if (obj.type === "reaction") {
+    const target = history.find(e => e.id === obj.targetId && e.side === "me");
+    if (target) target.stamp = obj.stamp;
+    save();
+    render();
+  }
+}
+
+/* =========================================================
+   送信
+   ========================================================= */
+function sendMessage(content) {
+  fadeIds = new Set();
+  for (const p of pendingMessages) {
+    fadeIds.add("fade-" + p.id);
+    const entry = { side: "them", ghost: true, time: p.time, id: p.id, len: p.content.length };
+    if (p.stamp) entry.stamp = p.stamp;
+    history.push(entry);
+  }
+  pendingMessages = [];
+
+  const id = Date.now() + "-" + Math.random().toString(36).slice(2,6);
+  const t = now();
+  if (!startedAt) startedAt = new Date().toISOString();
+  updatedAt = new Date().toISOString();
+  history.push({ side: "me", kind: "text", content, time: t, id });
+  transport.send({ type: "msg", from: myId, kind: "text", content, time: t, id });
+
+  save();
+  render();
+  fadeIds = new Set();
+}
+
+function sendReaction(targetId, stamp) {
+  const inPending = pendingMessages.find(p => p.id === targetId);
+  if (inPending) {
+    inPending.stamp = stamp;
+  } else {
+    const inHistory = history.find(e => e.id === targetId && e.side === "them");
+    if (inHistory) inHistory.stamp = stamp;
+  }
+  transport.send({ type: "reaction", from: myId, stamp, targetId });
+  save();
+  render();
+}
+
+/* =========================================================
+   描画
+   ========================================================= */
+const $thread = () => $("thread");
+
+function formatTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const mo = d.getMonth() + 1, da = d.getDate();
+  const h = ("0"+d.getHours()).slice(-2), m = ("0"+d.getMinutes()).slice(-2);
+  return `${mo}/${da} ${h}:${m}`;
+}
+
+function render() {
+  $("input").placeholder = "メッセージを入力…";
+
+  const th = $thread();
+  th.innerHTML = "";
+
+  if (history.length === 0 && pendingMessages.length === 0) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "最初のひとことを送ってみてください。";
+    th.appendChild(e);
+    return;
+  }
+
+  for (const m of history) {
+    th.appendChild(renderBubble(m));
+  }
+  for (const p of pendingMessages) {
+    th.appendChild(renderBubble({ side:"them", kind: p.kind, content: p.content, time: p.time, id: p.id, stamp: p.stamp }));
+  }
+
+  th.scrollTop = th.scrollHeight;
+}
+
+function appendLinkified(el, text) {
+  const urlRe = /(https?:\/\/[^\s<>"]+)/g;
+  let last = 0, match;
+  while ((match = urlRe.exec(text)) !== null) {
+    if (match.index > last) {
+      el.appendChild(document.createTextNode(text.slice(last, match.index)));
+    }
+    const a = document.createElement("a");
+    a.href = match[0];
+    a.textContent = match[0];
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    el.appendChild(a);
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) {
+    el.appendChild(document.createTextNode(text.slice(last)));
+  }
+}
+
+let openPickerId = null;
+
+function closePicker() {
+  openPickerId = null;
+  document.querySelectorAll(".react-picker").forEach(el => el.remove());
+}
+
+function renderBubble(m) {
+  const mine = m.side === "me";
+  const row = document.createElement("div");
+  row.className = "row " + (mine ? "right" : "left");
+
+  const wrap = document.createElement("div");
+  wrap.className = "bubble-row-wrap";
+
+  const b = document.createElement("div");
+  let cls = "bubble " + (mine ? "mine" : "them");
+  if (m.ghost) {
+    cls += " ghost";
+    if (fadeIds.has("fade-" + m.id)) cls += " ghost-fade";
+  }
+  b.className = cls;
+  if (m.ghost) {
+    b.textContent = Array(m.len || 3).fill("　").join("​");
+  } else {
+    appendLinkified(b, m.content || "");
+  }
+  wrap.appendChild(b);
+
+  if (m.stamp) {
+    const r = document.createElement("div");
+    r.className = "reaction";
+    r.textContent = m.stamp;
+    wrap.appendChild(r);
+  }
+
+  row.appendChild(wrap);
+
+  if (!mine && m.id) {
+    const trigger = document.createElement("button");
+    trigger.className = "react-trigger";
+    trigger.textContent = "☺";
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (openPickerId === m.id) { closePicker(); return; }
+      closePicker();
+      openPickerId = m.id;
+      const picker = document.createElement("div");
+      picker.className = "react-picker";
+      STAMPS.forEach(s => {
+        const btn = document.createElement("button");
+        btn.textContent = s;
+        btn.addEventListener("click", (e2) => {
+          e2.stopPropagation();
+          sendReaction(m.id, s);
+          closePicker();
+        });
+        picker.appendChild(btn);
+      });
+      wrap.appendChild(picker);
+    });
+    row.appendChild(trigger);
+  }
+
+  return row;
+}
+
+/* =========================================================
+   入力まわり
+   ========================================================= */
+const $input = () => $("input");
+const $send  = () => $("sendBtn");
+
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "input") return;
+  $send().disabled = e.target.value.trim() === "";
+  e.target.style.height = "auto";
+  e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+});
+
+function submitText() {
+  const v = $input().value.trim();
+  if (!v) return;
+  sendMessage(v);
+  $input().value = ""; $input().style.height = "auto"; $send().disabled = true;
+}
+$("sendBtn").addEventListener("click", submitText);
+
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitText(); }
+});
+
+function endedByPeer() {
+  if (transport) transport.close();
+  transport = null;
+  $("composer").classList.add("hidden");
+  const th = $thread();
+  const notice = document.createElement("div");
+  notice.className = "empty";
+  notice.textContent = "相手が退出したようです";
+  th.appendChild(notice);
+  th.scrollTop = th.scrollHeight;
+
+  setTimeout(() => {
+    localStorage.removeItem(storeKey());
+    history = []; pendingMessages = []; fadeIds = new Set();
+    startedAt = null; updatedAt = null; room = "";
+    $("chatHeader").classList.add("hidden");
+    $("thread").classList.add("hidden");
+    $("lobby").classList.remove("hidden");
+    $("roomInput").value = "";
+    $("startBtn").disabled = false;
+    setStatus("");
+  }, 3000);
+}
+
+function endRoom() {
+  if (transport) {
+    transport.send({ type: "end", from: myId });
+    transport.close();
+  }
+  transport = null;
+  localStorage.removeItem(storeKey());
+  history = []; pendingMessages = []; fadeIds = new Set();
+  startedAt = null; updatedAt = null; room = "";
+  closeMenu();
+  $("chatHeader").classList.add("hidden");
+  $("thread").classList.add("hidden");
+  $("composer").classList.add("hidden");
+  $("lobby").classList.remove("hidden");
+  $("roomInput").value = "";
+  $("startBtn").disabled = false;
+  setStatus("");
+}
+
+function leaveRoom() {
+  if (transport) transport.close();
+  transport = null;
+  history = []; pendingMessages = []; fadeIds = new Set();
+  startedAt = null; updatedAt = null; room = "";
+  closeMenu();
+  $("chatHeader").classList.add("hidden");
+  $("thread").classList.add("hidden");
+  $("composer").classList.add("hidden");
+  $("lobby").classList.remove("hidden");
+  $("roomInput").value = "";
+  $("startBtn").disabled = false;
+  setStatus("");
+}
+
+document.addEventListener("click", () => closePicker());
+
+// ---- メニュー ----
+function openMenu() {
+  closeMenu();
+  const overlay = document.createElement("div");
+  overlay.className = "menu-overlay";
+  overlay.id = "menuOverlay";
+  overlay.addEventListener("click", closeMenu);
+
+  const panel = document.createElement("div");
+  panel.className = "menu-panel";
+  panel.id = "menuPanel";
+
+  const title = document.createElement("h3");
+  title.textContent = "メニュー";
+  panel.appendChild(title);
+
+  const info = document.createElement("div");
+  info.className = "menu-item";
+  if (startedAt) {
+    info.innerHTML = `<b>開始</b>　${formatTime(startedAt)}<br><b>最終更新</b>　${formatTime(updatedAt)}`;
+  } else {
+    info.textContent = "まだ会話は始まっていません";
+  }
+  panel.appendChild(info);
+
+  const roomInfo = document.createElement("div");
+  roomInfo.className = "menu-item";
+  roomInfo.innerHTML = `<b>あいことば</b>　${room || "—"}`;
+  panel.appendChild(roomInfo);
+
+  const leaveBtn = document.createElement("button");
+  leaveBtn.className = "menu-action";
+  leaveBtn.textContent = "↺ 一時退出";
+  leaveBtn.addEventListener("click", () => {
+    if (!confirm("一時退出しますか？（相手はそのまま残ります）")) return;
+    leaveRoom();
+  });
+  panel.appendChild(leaveBtn);
+
+  const endBtn = document.createElement("button");
+  endBtn.className = "menu-action";
+  endBtn.style.color = "#c0392b";
+  endBtn.textContent = "✕ 終了";
+  endBtn.addEventListener("click", () => {
+    if (!confirm("会話を終了しますか？（相手にも通知され、ルームが閉じます）")) return;
+    endRoom();
+  });
+  panel.appendChild(endBtn);
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(panel);
+}
+
+function closeMenu() {
+  const o = $("menuOverlay"); if (o) o.remove();
+  const p = $("menuPanel"); if (p) p.remove();
+}
+
+$("menuBtn").addEventListener("click", openMenu);
+
+// ---- キャプチャ ----
+$("captureBtn").addEventListener("click", async () => {
+  const btn = $("captureBtn");
+  btn.disabled = true;
+  btn.style.opacity = ".4";
+
+  try {
+    if (!window.html2canvas) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+        s.onload = resolve;
+        s.onerror = () => reject(new Error("html2canvas の読み込みに失敗しました"));
+        document.head.appendChild(s);
+      });
+    }
+
+    const th = $("thread");
+    const header = $("chatHeader");
+    const origHeight = th.style.height;
+    const origOverflow = th.style.overflow;
+    const origFlex = th.style.flex;
+    const origBodyOverflow = document.body.style.overflow;
+    const origBodyHeight = document.body.style.height;
+
+    th.style.height = th.scrollHeight + "px";
+    th.style.overflow = "visible";
+    th.style.flex = "none";
+    header.style.display = "none";
+    document.body.style.overflow = "visible";
+    document.body.style.height = "auto";
+
+    const canvas = await html2canvas(document.body, {
+      scale: 2,
+      useCORS: true,
+    });
+
+    th.style.height = origHeight;
+    th.style.overflow = origOverflow;
+    th.style.flex = origFlex;
+    header.style.display = "";
+    document.body.style.overflow = origBodyOverflow;
+    document.body.style.height = origBodyHeight;
+
+    const dataUrl = canvas.toDataURL("image/png");
+
+    const overlay = document.createElement("div");
+    overlay.className = "capture-overlay";
+
+    const img = document.createElement("img");
+    img.src = dataUrl;
+    overlay.appendChild(img);
+
+    const hint = document.createElement("div");
+    hint.className = "capture-hint";
+    hint.textContent = "画像を長押しして保存できます";
+    overlay.appendChild(hint);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "capture-close";
+    closeBtn.textContent = "閉じる";
+    closeBtn.addEventListener("click", () => overlay.remove());
+    overlay.appendChild(closeBtn);
+
+    document.body.appendChild(overlay);
+  } catch (e) {
+    alert("キャプチャに失敗しました: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = "";
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>消えていく会話</title>
+<style>
+  :root {
+    --bg: #f4f1ec;
+    --ink: #2b2724;
+    --muted: #9a938a;
+    --mine: #3a3530;
+    --mine-text: #f7f4ef;
+    --ghost-line: #cfc7ba;
+    --bar: #ffffff;
+    --accent: #b08968;
+    --shadow: rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* ---- header ---- */
+  header {
+    flex: 0 0 auto;
+    background: var(--bar);
+    border-bottom: 1px solid #ece6dc;
+    padding: 10px 14px calc(10px + env(safe-area-inset-top));
+    padding-top: calc(10px + env(safe-area-inset-top));
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .turn {
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+    line-height: 1.3;
+  }
+  .turn small { display:block; font-weight:400; color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+  /* ---- thread ---- */
+  .thread {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 16px 14px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .row { display: flex; }
+  .row.right { justify-content: flex-end; }
+  .row.left  { justify-content: flex-start; }
+
+  .bubble {
+    max-width: 78%;
+    padding: 10px 13px;
+    border-radius: 18px;
+    font-size: 15.5px;
+    line-height: 1.45;
+    word-break: break-word;
+    position: relative;
+    animation: pop .18s ease;
+  }
+  @keyframes pop { from { transform: scale(.96); opacity:.4 } to { transform: scale(1); opacity:1 } }
+
+  .bubble.mine  { background: var(--mine); color: var(--mine-text); border-bottom-right-radius: 5px; }
+  .bubble.them  { background: #fff; color: var(--ink); border:1px solid #ece6dc; border-bottom-left-radius: 5px; }
+  .bubble.stamp { font-size: 30px; padding: 4px 10px; background: transparent; border: none; }
+  .time { font-size: 10px; color: var(--muted); margin: 2px 6px 0; text-align: right; }
+  .row.left .time { text-align: left; }
+
+  /* ghost = a message that has been answered and is now gone */
+  .bubble.ghost {
+    background: transparent;
+    border: 1px dashed var(--ghost-line);
+    color: transparent;
+    min-width: 54px;
+    min-height: 38px;
+    border-radius: 18px;
+  }
+  .bubble.ghost.them { border-bottom-left-radius: 5px; }
+  .bubble.ghost.mine { border-bottom-right-radius: 5px; }
+  .ghost-fade { animation: fade .9s ease forwards; }
+  @keyframes fade {
+    0%   { color: var(--ink); border-color: transparent; background:#fff; }
+    100% { color: transparent; border-color: var(--ghost-line); background: transparent; }
+  }
+
+  .empty {
+    margin: auto; color: var(--muted); font-size: 13px; text-align:center; line-height:1.9;
+    padding: 0 30px;
+  }
+
+  /* ---- composer ---- */
+  .composer {
+    flex: 0 0 auto;
+    background: var(--bar);
+    border-top: 1px solid #ece6dc;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  }
+  .stamps { display:flex; gap:6px; overflow-x:auto; padding: 2px 2px 8px; }
+  .stamps button {
+    flex: 0 0 auto; border:0; background:#f1ebe1; border-radius:999px;
+    font-size:20px; width:42px; height:42px; line-height:1;
+  }
+  .stamps button:active { transform: scale(.9); }
+  .inputrow { display:flex; gap:8px; align-items:flex-end; }
+  textarea {
+    flex:1; resize:none; border:1px solid #e3dccf; border-radius:20px;
+    padding:10px 14px; font-size:16px; font-family:inherit; max-height:120px; line-height:1.4;
+    background:#fbf9f5;
+  }
+  textarea:focus { outline:none; border-color: var(--accent); }
+  .send {
+    flex:0 0 auto; border:0; background: var(--mine); color:#fff;
+    border-radius:50%; width:44px; height:44px; font-size:18px;
+  }
+  .send:disabled { opacity:.35; }
+
+  .reset { border:0; background:transparent; color:var(--muted); font-size:18px; padding:4px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="turn" id="turnLabel"></div>
+    <button class="reset" id="resetBtn" title="最初から">↺</button>
+  </header>
+
+  <div class="thread" id="thread"></div>
+
+  <div class="composer" id="composer">
+    <div class="stamps" id="stamps"></div>
+    <div class="inputrow">
+      <textarea id="input" rows="1" placeholder="メッセージを入力…"></textarea>
+      <button class="send" id="sendBtn" disabled>↑</button>
+    </div>
+  </div>
+
+<script>
+const STORE_KEY = "kieru_kaiwa_v2";
+const STAMPS = ["👍","❤️","😂","🙏","😮","😢","✨","👀"];
+
+let state = load();
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (s && Array.isArray(s.messages)) return s;
+  } catch (e) {}
+  return { messages: [], speaker: "you" }; // speaker = 次に話す人
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+function now() {
+  const d = new Date();
+  return ("0"+d.getHours()).slice(-2) + ":" + ("0"+d.getMinutes()).slice(-2);
+}
+
+/* m が viewer から見て「消えている（ghost）」か。
+   自分の言葉は常に残る。相手の言葉は、返信済みなら消える。
+   交互ターン制なので、未返信の相手メッセージ＝最後の1件かつ今が viewer の番のときだけ。 */
+/* 視点は常に「あなた」に固定。
+   自分の言葉は常に残る。相手の言葉は、最新の1件（＝まだ返信していないもの）だけが見え、
+   自分が返信を送った瞬間に最新でなくなり、空の吹き出しになる。 */
+function isGhost(m, viewer) {
+  if (m.sender === viewer) return false;
+  const last = state.messages[state.messages.length - 1];
+  return !(last && last.id === m.id);
+}
+
+const $thread = document.getElementById("thread");
+
+function render() {
+  const viewer = "you";
+
+  // header
+  const turnLabel = document.getElementById("turnLabel");
+  const who = state.speaker === "you" ? "あなた" : "相手";
+  turnLabel.innerHTML = `いま <b>${who}</b> の番<small>あなたが返信を送ると、相手の言葉は消えます</small>`;
+  const inp = document.getElementById("input");
+  if (inp) inp.placeholder = `${who}のメッセージを入力…`;
+
+  // body
+  $thread.innerHTML = "";
+  if (state.messages.length === 0) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "まだ何もありません。\n最初のひとことを送ってみてください。";
+    $thread.appendChild(e);
+    return;
+  }
+
+  for (const m of state.messages) {
+    const ghost = isGhost(m, viewer);
+    const mine = m.sender === viewer;
+    const row = document.createElement("div");
+    row.className = "row " + (mine ? "right" : "left");
+
+    const wrap = document.createElement("div");
+    const b = document.createElement("div");
+    let cls = "bubble " + (mine ? "mine" : "them");
+    if (m.kind === "stamp" && !ghost) cls += " stamp";
+    if (ghost) {
+      cls += " ghost " + (mine ? "mine" : "them");
+      // 直前に消えたものはフェードさせる
+      if (m.id === justSentGhostId) cls += " ghost-fade";
+    }
+    b.className = cls;
+    b.textContent = ghost ? "" : m.content;
+    wrap.appendChild(b);
+
+    const t = document.createElement("div");
+    t.className = "time";
+    t.textContent = m.time;
+    wrap.appendChild(t);
+
+    row.appendChild(wrap);
+    $thread.appendChild(row);
+  }
+  $thread.scrollTop = $thread.scrollHeight;
+}
+
+let justSentGhostId = null;
+
+function sendMessage(kind, content) {
+  const sender = state.speaker;
+
+  // 送信した瞬間、相手の直前メッセージが消える → そのidを掴んでおく（フェード演出用）
+  const last = state.messages[state.messages.length - 1];
+  justSentGhostId = (last && last.sender !== sender) ? last.id : null;
+
+  state.messages.push({
+    id: Date.now() + "-" + Math.random().toString(36).slice(2,6),
+    sender, kind, content, time: now()
+  });
+  state.speaker = (sender === "you") ? "other" : "you";
+  save();
+
+  const newId = state.messages[state.messages.length - 1].id;
+  render(); // speakerは既に交代済み。直前の相手メッセージはここで自動的にghost化
+  justSentGhostId = null;
+}
+
+/* ---- composer ---- */
+const $input = document.getElementById("input");
+const $send  = document.getElementById("sendBtn");
+
+$input.addEventListener("input", () => {
+  $send.disabled = $input.value.trim() === "";
+  $input.style.height = "auto";
+  $input.style.height = Math.min($input.scrollHeight, 120) + "px";
+});
+function submitText() {
+  const v = $input.value.trim();
+  if (!v) return;
+  sendMessage("text", v);
+  $input.value = ""; $input.style.height = "auto"; $send.disabled = true;
+}
+$send.addEventListener("click", submitText);
+
+// Mac: ⌘+Enter / Windows: Ctrl+Enter で送信
+$input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    submitText();
+  }
+});
+
+const $stamps = document.getElementById("stamps");
+STAMPS.forEach(s => {
+  const btn = document.createElement("button");
+  btn.textContent = s;
+  btn.addEventListener("click", () => sendMessage("stamp", s));
+  $stamps.appendChild(btn);
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (confirm("会話を最初からやり直しますか？（消えた言葉は戻りません）")) {
+    state = { messages: [], speaker: "you" };
+    save(); render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
