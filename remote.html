@@ -225,9 +225,17 @@
 <script>
 /* =========================================================
    WebSocket Transport
-   サーバー(server.py)に接続し、あいことばでルームに参加。
+   Cloudflare Worker(worker/)に接続し、あいことばでルームに参加。
    同じルームの相手とメッセージを中継する。
+   ローカル開発時(http)は wrangler dev (ポート8787) に接続する。
    ========================================================= */
+function wsServerUrl(room) {
+  const base = location.protocol === "http:"
+    ? `ws://${location.hostname}:8787`
+    : "wss://vanishment-chat-worker.crazy-music-man.workers.dev";
+  return `${base}/ws?room=${encodeURIComponent(room)}`;
+}
+
 class WSTransport {
   constructor(onMessage) {
     this.ws = null;
@@ -237,9 +245,7 @@ class WSTransport {
   }
 
   connect(room, onJoined) {
-    const host = location.hostname;
-    const wsPort = 8001;
-    this.ws = new WebSocket(`ws://${host}:${wsPort}`);
+    this.ws = new WebSocket(wsServerUrl(room));
 
     this.ws.addEventListener("open", () => {
       this.ws.send(JSON.stringify({ type: "join", room }));
@@ -267,7 +273,7 @@ class WSTransport {
     });
 
     this.ws.addEventListener("error", () => {
-      if (!this.intentionalClose) setStatus("サーバーに接続できません。server.py が起動しているか確認してください。");
+      if (!this.intentionalClose) setStatus("サーバーに接続できません。しばらくしてからもう一度お試しください。");
     });
   }
 
