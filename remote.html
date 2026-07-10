@@ -98,7 +98,7 @@
   /* ---- thread ---- */
   .thread {
     flex: 1 1 auto; overflow-y: auto; padding: 16px 14px 8px;
-    display: flex; flex-direction: column; gap: 10px; -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column; -webkit-overflow-scrolling: touch;
   }
   .row { display: flex; }
   .row.right { justify-content: flex-end; }
@@ -456,6 +456,17 @@ function formatTime(iso) {
   return `${mo}/${da} ${h}:${m}`;
 }
 
+function tsFromId(id) {
+  if (!id) return 0;
+  const n = parseInt(id.split("-")[0], 10);
+  return isNaN(n) ? 0 : n;
+}
+
+function timeGap(prevId, curId) {
+  const dt = Math.abs(tsFromId(curId) - tsFromId(prevId));
+  return Math.min(4 + dt / 10_000, 60);
+}
+
 function render() {
   $("input").placeholder = "メッセージを入力…";
 
@@ -470,11 +481,16 @@ function render() {
     return;
   }
 
-  for (const m of history) {
-    th.appendChild(renderBubble(m));
-  }
-  for (const p of pendingMessages) {
-    th.appendChild(renderBubble({ side:"them", kind: p.kind, content: p.content, time: p.time, id: p.id, stamp: p.stamp }));
+  const all = [
+    ...history,
+    ...pendingMessages.map(p => ({ side:"them", kind: p.kind, content: p.content, time: p.time, id: p.id, stamp: p.stamp }))
+  ];
+  let prevId = null;
+  for (const m of all) {
+    const row = renderBubble(m);
+    row.style.marginTop = (prevId ? timeGap(prevId, m.id) : 0) + "px";
+    th.appendChild(row);
+    prevId = m.id;
   }
 
   th.scrollTop = th.scrollHeight;
