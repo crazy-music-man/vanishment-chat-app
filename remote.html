@@ -223,6 +223,8 @@
   </div>
 
 <script>
+const APP_VERSION = "v1.0.0";
+
 /* =========================================================
    WebSocket Transport
    Cloudflare Worker(worker/)に接続し、あいことばでルームに参加。
@@ -716,6 +718,12 @@ function openMenu() {
     endRoom();
   });
   panel.appendChild(endBtn);
+
+  const ver = document.createElement("div");
+  ver.className = "menu-item";
+  ver.style.marginTop = "auto";
+  ver.textContent = APP_VERSION;
+  panel.appendChild(ver);
 
   document.body.appendChild(overlay);
   document.body.appendChild(panel);
