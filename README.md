@@ -45,6 +45,12 @@ git push  # GitHub Pages が自動反映
 
 ## Changelog
 
+### v1.0.1 (2026-07-10)
+
+- ロビーの説明文を簡潔に変更
+- CSS / JS を外部ファイル（style.css, app.js）に分離し、remote.html を構造のみに整理
+- 退出・終了処理の重複コードを `resetToLobby()` に共通化
+
 ### v1.0.0 (2026-07-10)
 
 初回リリース。
