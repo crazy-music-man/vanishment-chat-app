@@ -301,7 +301,7 @@ function closePicker() {
 function renderBubble(m) {
   const mine = m.side === "me";
   const row = document.createElement("div");
-  row.className = "row " + (mine ? "right" : "left");
+  row.className = "row";
 
   const wrap = document.createElement("div");
   wrap.className = "bubble-row-wrap";
@@ -326,8 +326,6 @@ function renderBubble(m) {
     r.textContent = m.stamp;
     wrap.appendChild(r);
   }
-
-  row.appendChild(wrap);
 
   if (!mine && m.id) {
     const trigger = document.createElement("button");
@@ -354,6 +352,7 @@ function renderBubble(m) {
     });
     row.appendChild(trigger);
   }
+  row.appendChild(wrap);
 
   return row;
 }

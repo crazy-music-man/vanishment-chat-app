@@ -93,9 +93,7 @@ header {
   flex: 1 1 auto; overflow-y: auto; padding: 16px 14px 8px;
   display: flex; flex-direction: column; -webkit-overflow-scrolling: touch;
 }
-.row { display: flex; }
-.row.right { justify-content: flex-end; }
-.row.left  { justify-content: flex-start; align-items: flex-start; }
+.row { display: flex; justify-content: flex-end; }
 .bubble-row-wrap { max-width: 70%; width: fit-content; position: relative; }
 .bubble {
   padding: 10px 13px; border-radius: 18px;
@@ -106,18 +104,17 @@ header {
 .bubble a { color: var(--accent); word-break: break-all; }
 .bubble.mine a { color: #eafcff; }
 .bubble.mine  { background: var(--mine); color: var(--mine-text); border-bottom-right-radius: 5px; }
-.bubble.them  { background: rgba(255,255,255,.85); color: var(--ink); border: 1px solid #a3cfc6; border-bottom-left-radius: 5px; }
+.bubble.them  { background: rgba(255,255,255,.85); color: var(--ink); border: 1px solid #a3cfc6; border-bottom-right-radius: 5px; }
 .reaction {
   font-size: 20px; display: inline-block;
   background: rgba(255,255,255,.8); border: 1px solid #c2ddd6; border-radius: 999px;
   padding: 1px 6px; margin-top: -6px; position: relative; z-index: 1;
   animation: pop .18s ease;
 }
-.row.left .reaction { margin-left: 8px; }
-.row.right .reaction { margin-right: 8px; align-self: flex-end; }
+.reaction { margin-right: 8px; align-self: flex-end; }
 .bubble.ghost {
   background: rgba(255,255,255,.4); border: 1px dashed var(--ghost-line); color: transparent;
-  min-width: 54px; min-height: 38px; border-radius: 18px; border-bottom-left-radius: 5px;
+  min-width: 54px; min-height: 38px; border-radius: 18px; border-bottom-right-radius: 5px;
   user-select: none; -webkit-user-select: none;
 }
 .ghost-fade { animation: fade .9s ease forwards; }
@@ -137,7 +134,7 @@ header {
 .react-picker {
   display: flex; gap: 4px; background: rgba(255,255,255,.85); border: 1px solid #c2ddd6;
   border-radius: 999px; padding: 4px 8px; box-shadow: 0 4px 12px var(--shadow);
-  position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 10;
+  position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 10;
   animation: pop .15s ease;
 }
 .react-picker button {
