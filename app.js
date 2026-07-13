@@ -239,7 +239,11 @@ function tsFromId(id) {
 
 function timeGap(prevId, curId) {
   const dt = Math.abs(tsFromId(curId) - tsFromId(prevId));
-  return Math.min(4 + dt / 10_000, 60);
+  const MIN_GAP = 4;      // 返信がほぼ瞬時のときの隙間(px)
+  const MAX_GAP = 140;    // 時間が空いたときに漸近する上限(px)
+  const HALF = 30_000;    // 隙間が中間値に達するまでの時間(ms) 小さいほど早く飽和
+  // 双曲線飽和: 短い時間ほど大きく開き、長い時間ほど変化が鈍る
+  return MIN_GAP + (MAX_GAP - MIN_GAP) * dt / (dt + HALF);
 }
 
 function render() {
