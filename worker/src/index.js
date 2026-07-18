@@ -75,14 +75,32 @@ export class Room {
     if (msg.type === "join") {
       const roomName = (msg.room || "").trim();
       if (!roomName) return;
-      const others = this.joinedSockets().filter((s) => s !== ws);
+      const clientId = (msg.clientId || "").toString();
+
+      // fix A: 同じ端末(clientId)の古い接続が残っていたら閉じて枠を返す。
+      // リロード・復帰・ネットワーク瞬断のあとでも、自分の枠を確実に奪還できる。
+      const evicted = new Set();
+      if (clientId) {
+        for (const s of this.joinedSockets()) {
+          if (s === ws) continue;
+          let att = null;
+          try { att = s.deserializeAttachment(); } catch {}
+          if (att?.clientId && att.clientId === clientId) {
+            evicted.add(s);
+            try { s.close(1000, "replaced by same client"); } catch {}
+          }
+        }
+      }
+
+      // close() は非同期なので、いま閉じたソケットは数に入れないよう除外する
+      const others = this.joinedSockets().filter((s) => s !== ws && !evicted.has(s));
       if (others.length >= 2) {
         ws.send(JSON.stringify({ type: "full", room: roomName }));
         return;
       }
-      ws.serializeAttachment({ joined: true, room: roomName });
+      ws.serializeAttachment({ joined: true, room: roomName, clientId });
       ws.send(JSON.stringify({ type: "joined", room: roomName }));
-      console.log(`[${roomName}] ${others.length + 1}人目が参加`);
+      console.log(`[${roomName}] 参加 (clientId=${clientId || "-"}) 現在${others.length + 1}人`);
       return;
     }
 

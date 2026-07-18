@@ -19,13 +19,17 @@ class WSTransport {
     this.onMessage = onMessage;
     this.queue = [];
     this.intentionalClose = false;
+    this.onFull = null;
+    this.onClose = null; // 予期しない切断時のコールバック（自動再接続に使う）
   }
 
-  connect(room, onJoined) {
+  connect(room, clientId, onJoined) {
+    this.intentionalClose = false;
     this.ws = new WebSocket(wsServerUrl(room));
 
     this.ws.addEventListener("open", () => {
-      this.ws.send(JSON.stringify({ type: "join", room }));
+      // clientId を載せ、同一端末の古い接続をサーバー側で奪還できるようにする（fix A）
+      this.ws.send(JSON.stringify({ type: "join", room, clientId }));
     });
 
     this.ws.addEventListener("message", (e) => {
@@ -46,11 +50,11 @@ class WSTransport {
     });
 
     this.ws.addEventListener("close", () => {
-      if (!this.intentionalClose) setStatus("サーバーとの接続が切れました");
+      if (!this.intentionalClose && this.onClose) this.onClose();
     });
 
     this.ws.addEventListener("error", () => {
-      if (!this.intentionalClose) setStatus("サーバーに接続できません。しばらくしてからもう一度お試しください。");
+      // error の直後に close が発火するので、再接続は close 側でまとめて処理する
     });
   }
 
@@ -115,6 +119,9 @@ function setStatus(msg) {
 /* =========================================================
    展示モード：あいことばなしで固定ルームに自動接続
    ========================================================= */
+let reconnectTimer = null;
+let reconnectDelay = 1000; // 再接続の待ち時間(ms) 指数バックオフ
+
 function startDisplay() {
   room = DISPLAY_ROOM;
 
@@ -130,19 +137,57 @@ function startDisplay() {
   loadLocal();
   render();
 
+  connectRoom();
+}
+
+function connectRoom() {
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  if (transport) { transport.close(); transport = null; }
+
   setStatus("接続しています…");
   transport = new WSTransport(onMessage);
   transport.onFull = () => {
-    setStatus("接続が混み合っています。数秒後にもう一度試します…");
+    // fix A により自分の枠は奪還される。ここに来るのは他に2台いる正当なケース
     transport.close();
     transport = null;
-    setTimeout(startDisplay, 3000);
+    scheduleReconnect("接続の空きを待っています…");
   };
-  transport.connect(room, () => {
+  transport.onClose = () => {
+    // ネットワーク切断など予期しない切断 → 自動再接続（fix C）
+    transport = null;
+    scheduleReconnect("再接続しています…");
+  };
+  transport.connect(room, myId, () => {
+    reconnectDelay = 1000; // 接続成功でバックオフをリセット
     setStatus("");
     transport.send({ type: "hello", from: myId });
     render();
   });
+}
+
+function scheduleReconnect(message) {
+  if (reconnectTimer) return;                          // 二重予約しない
+  if (document.visibilityState === "hidden") return;   // 非表示中は再接続しない（fix B）
+  setStatus(message || "再接続しています…");
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connectRoom();
+  }, reconnectDelay);
+  reconnectDelay = Math.min(reconnectDelay * 2, 15000); // 最大15秒
+}
+
+// 枠をすぐ解放するため、非表示・離脱時は明示的に切断する（fix B）
+function disconnectForHidden() {
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  if (transport) { transport.close(); transport = null; }
+  setStatus("");
+}
+
+// 表示に戻ったら、未接続のときだけ再接続する（fix C）
+function ensureConnected() {
+  if (transport || reconnectTimer) return;
+  reconnectDelay = 1000;
+  connectRoom();
 }
 
 /* =========================================================
@@ -411,7 +456,7 @@ function resetToLobby() {
   startedAt = null; updatedAt = null;
   setStatus("");
   render();
-  startDisplay();
+  connectRoom();
 }
 
 function endedByPeer() {
@@ -438,13 +483,6 @@ function endRoom() {
   }
   transport = null;
   localStorage.removeItem(storeKey());
-  closeMenu();
-  resetToLobby();
-}
-
-function leaveRoom() {
-  if (transport) transport.close();
-  transport = null;
   closeMenu();
   resetToLobby();
 }
@@ -505,6 +543,14 @@ function closeMenu() {
 $("menuBtn").addEventListener("click", openMenu);
 
 /* =========================================================
-   起動
+   起動・接続維持
    ========================================================= */
+// バックグラウンド/ロック/離脱で枠を解放し、復帰で再接続する（fix B / C）
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") disconnectForHidden();
+  else ensureConnected();
+});
+window.addEventListener("pagehide", disconnectForHidden);
+window.addEventListener("pageshow", (e) => { if (e.persisted) ensureConnected(); });
+
 startDisplay();
