@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Van!shment chat — 展示モード</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- チャット（展示モードでは最初から表示） -->
+  <header id="chatHeader">
+    <div class="header-spacer"></div>
+    <button class="menu-btn" id="menuBtn" title="メニュー">
+      <span class="menu-icon">☰</span><span class="menu-label">メニュー</span>
+    </button>
+  </header>
+
+  <div id="displayStatus" class="display-status"></div>
+
+  <div class="thread" id="thread"></div>
+
+  <div class="composer" id="composer">
+    <div class="inputrow">
+      <textarea id="input" rows="1" placeholder="メッセージを入力…"></textarea>
+      <button class="send" id="sendBtn" disabled>↑</button>
+    </div>
+  </div>
+
+<script src="app.js"></script>
+</body>
+</html>
