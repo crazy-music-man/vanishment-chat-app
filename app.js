@@ -1,4 +1,4 @@
-const APP_VERSION = "v1.0.1";
+const APP_VERSION = "v1.0.2";
 
 /* =========================================================
    WebSocket Transport
@@ -364,23 +364,39 @@ function renderBubble(m) {
 /* =========================================================
    入力まわり
    ========================================================= */
-document.addEventListener("input", (e) => {
-  if (e.target.id !== "input") return;
-  $("sendBtn").disabled = e.target.value.trim() === "";
-  e.target.style.height = "auto";
-  e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+const inputEl = $("input");
+let composing = false; // IME変換中（ひらがなフリック入力などの未確定状態）フラグ
+
+function resizeInput() {
+  inputEl.style.height = "auto";
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+}
+
+// iOSのフリック入力では、変換中に高さ再計算(reflow)を走らせると
+// 未確定文字が壊れる／消えるため、確定するまでリサイズを保留する
+inputEl.addEventListener("compositionstart", () => { composing = true; });
+inputEl.addEventListener("compositionend", () => {
+  composing = false;
+  $("sendBtn").disabled = inputEl.value.trim() === "";
+  resizeInput();
+});
+
+inputEl.addEventListener("input", (e) => {
+  $("sendBtn").disabled = inputEl.value.trim() === "";
+  if (composing || e.isComposing) return; // 変換中は高さ調整しない
+  resizeInput();
 });
 
 function submitText() {
-  const inp = $("input");
-  const v = inp.value.trim();
+  const v = inputEl.value.trim();
   if (!v) return;
   sendMessage(v);
-  inp.value = ""; inp.style.height = "auto"; $("sendBtn").disabled = true;
+  inputEl.value = ""; inputEl.style.height = "auto"; $("sendBtn").disabled = true;
 }
 $("sendBtn").addEventListener("click", submitText);
 
-$("input").addEventListener("keydown", (e) => {
+inputEl.addEventListener("keydown", (e) => {
+  if (composing || e.isComposing) return; // 変換確定のEnterでは送信しない
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitText(); }
 });
 
